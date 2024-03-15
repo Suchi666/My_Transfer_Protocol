@@ -1,3 +1,5 @@
+#include<time.h>
+
 void *receive_thread(void *arg) {
     // Cast argument to the set of file descriptors
     fd_set readfds;
@@ -304,4 +306,17 @@ int m_sendto(int sockfd, const char message[MAX_BUFFER_SIZE], const char *dest_i
 
     // Return the number of bytes written
     return message_len;
+}
+
+int dropMessage(float p)
+{
+    srand(time(NULL));
+    float random_number = (float)rand() / RAND_MAX;
+
+    // Check if the generated number is less than p
+    if (random_number < p) {
+        return 1; // Drop the message
+    } else {
+        return 0; // Do not drop the message
+    }
 }
