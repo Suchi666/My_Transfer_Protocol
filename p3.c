@@ -98,7 +98,7 @@ void *receive_thread(void *arg) {
 void *send_thread(void *arg) {
     while (1) {
         // Sleep for some time (< T/2)
-        usleep(100000); // 0.1 seconds, adjust as needed
+        usleep(100000); // 100 milliseconds, adjust as needed
 
         // Get current time
         struct timeval current_time;

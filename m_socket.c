@@ -20,13 +20,16 @@
 #define DATA_MESSAGE 0
 #define ACK_MESSAGE 1
 #define SOCK_MTP 1
-
+//  Error values 
 #define EINVAL 1
 #define ENOBUFS 2
 #define UDPSOCK 3
 #define ENOTBOUND 4
 #define ENOMSG 5
-#define TIME_OUT 1000
+#define TIME_OUT 1000 //milliseconds
+#define msec 1000
+
+
 // Structure for MTP socket information
 typedef struct {
     int is_free;
@@ -38,17 +41,16 @@ typedef struct {
     char recv_buffer[5][MAX_MSG_LEN];
     int swnd[MAX_WINDOW_SIZE];
     int rwnd[MAX_WINDOW_SIZE];
+    int recvWindSize;
     int sendBuffSize;
     struct timeval last_send_time;
 } MTPSocket;
 
 
 int mtp_errno = 0;
-// Global shared memory
 MTPSocket *shared_memory;
-
-// Mutex for synchronization
 pthread_mutex_t mutex;
+int buffer_index;
 
 // Thread function for receiving messages
 void *receive_thread(void *arg) {
@@ -58,22 +60,74 @@ void *receive_thread(void *arg) {
     pthread_mutex_unlock(&mutex);
     pthread_exit(NULL);
 }
+long timeval_diff(struct timeval *start, struct timeval *end) {
+    long seconds_diff = end->tv_sec - start->tv_sec;
+    long microseconds_diff = end->tv_usec - start->tv_usec;
+    // Handle the carry-over from microseconds to seconds
+    if (microseconds_diff < 0) {
+        seconds_diff--;
+        microseconds_diff += 1000000;
+    }
+    // Convert time difference to milliseconds
+    return seconds_diff * 1000 + microseconds_diff / 1000;
+}
 void *send_thread(void *arg)
 {
-  pthread_mutex_lock(&mutex);
   printf("Sender thread\n");
-//   while (1)
-//   {
-//     sleep(0.1);
-//     struct timeval current_time;
-//     gettimeofday(&current_time, NULL);
-//     for (int i = 0; i < MAX_SOCKETS; i++){
-//       if (!shared_memory[i].is_free) {
-        
-//       }
-//     }
-//   }
-  pthread_mutex_unlock(&mutex);
+  while (1)
+  {
+    usleep(20 * msec);
+    struct timeval current_time;
+    pthread_mutex_lock(&mutex);
+    for (int i = 0; i < MAX_SOCKETS; i++){
+      if (!shared_memory[i].is_free){
+        int wind_size=0;
+        struct sockaddr_in client_addr;
+        client_addr.sin_family = AF_INET;
+        client_addr.sin_addr.s_addr = inet_addr(shared_memory[i].dest_ip);
+        client_addr.sin_port = htons(shared_memory[i].dest_port);
+        gettimeofday(&current_time, NULL);
+        int time_diff = timeval_diff(&current_time, &shared_memory[i].last_send_time);
+        if (time_diff > TIME_OUT){
+          for (int j = 0; j < MAX_WINDOW_SIZE; j++){
+            if (shared_memory[i].swnd[j] != -1){
+              wind_size++;
+              char mess[1001];
+              sprintf(mess, "%d", shared_memory[i].swnd[j]);
+              strcat(mess,shared_memory[i].send_buffer[shared_memory[i].swnd[j]]);
+              if (sendto(shared_memory[i].udp_socket_id,mess, strlen(mess), 0, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
+                printf("Send failed");
+                return;
+              }
+            }
+          }
+        }
+        if(wind_size<MAX_WINDOW_SIZE && shared_memory[i].recvWindSize>wind_size){
+          int idx=MAX_WINDOW_SIZE-1;
+          while(shared_memory[i].swnd[idx]==-1 && idx>=0)idx--;
+          if(idx<0)idx=0;
+          idx=(shared_memory[i].swnd[idx]+1)%MAX_SEND_BUFFER;
+          // int send_num=shared_memory[i].recvWindSize-wind_size;
+          int end_idx=(idx-1)>0?(idx-1):MAX_SEND_BUFFER-1;
+          while(idx!=end_idx && wind_size<shared_memory[i].recvWindSize){
+            if(strlen(shared_memory[i].send_buffer[idx])!=0){
+              shared_memory[i].swnd[wind_size]=idx;
+              wind_size++;
+              char mess[1001];
+              sprintf(mess, "%d", idx);
+              strcat(mess,shared_memory[i].send_buffer[idx]);
+              if (sendto(shared_memory[i].udp_socket_id,mess, strlen(mess), 0, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
+                printf("Send failed");
+                return;
+              }
+            }
+            idx=(idx+1)%MAX_SEND_BUFFER; 
+          }
+        }
+      }
+    }
+    pthread_mutex_unlock(&mutex);
+  }
   pthread_exit(NULL);
 }
 void printBufferContent(int sockfd) {
@@ -106,19 +160,18 @@ int m_sendto(int sockfd,char message[MAX_MSG_LEN], char dest_ip[16], int dest_po
     }
     // Check if there is enough space in the send buffer
     if (mtpsock.sendBuffSize>=MAX_SEND_BUFFER) {mtp_errno = ENOBUFS;return -1;}
-    // Copy the message to the send buffer
-    printf("ERROR\n");
-    printf("message to be sent = %s\n",message);
-    printf("Initial Buffer Size = %d\n",mtpsock.sendBuffSize);
-    strcpy(shared_memory[entry_index].send_buffer[mtpsock.sendBuffSize], message);
+    // printf("ERROR\n");
+    // printf("message to be sent = %s\n",message);
+    // printf("Initial Buffer Size = %d\n",mtpsock.sendBuffSize);
+    strcpy(shared_memory[entry_index].send_buffer[buffer_index], message);
     printf("%s\n",shared_memory[entry_index].send_buffer[mtpsock.sendBuffSize]);
     shared_memory[entry_index].sendBuffSize++;
+    buffer_index++;
+    buffer_index=buffer_index%10;
     printBufferContent(mtpsock.udp_socket_id);
     pthread_mutex_unlock(&mutex);
-    
     return strlen(message);
 }
-
 
 int find_free_entry() {
     for (int i = 0; i < MAX_SOCKETS; i++) {
@@ -188,7 +241,8 @@ void init() {
     if (shared_memory == (MTPSocket *) -1) {
         perror("shmat");
         exit(EXIT_FAILURE);
-    }    
+    }
+    buffer_index=0;    
     for (int i = 0; i < MAX_SOCKETS; i++) {
         shared_memory[i].is_free = 1; // Mark as free
         shared_memory[i].pid = -1; // Initialize to invalid PID
@@ -221,13 +275,11 @@ void init() {
     pthread_join(thread_S, NULL);
 }
 
-
-
 int main() {
     init();
     char source_ip[16]="127.0.0.1";
     int source_port=5000;
-    char dest_ip[16]="192.168.1.100";
+    char dest_ip[16]="127.0.0.1";
     int dest_port=8000;
     int mtp_socket = m_socket(AF_INET, SOCK_MTP, 0);
     if(mtp_socket==-1){
