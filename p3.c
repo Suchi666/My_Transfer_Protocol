@@ -140,54 +140,6 @@ void *send_thread(void *arg) {
     return NULL;
 }
 
-int m_sendto(int sockfd, const void *buf, size_t len, int flags,
-             const struct sockaddr *dest_addr, socklen_t addrlen) {
-    // Check if socket type is SOCK_MTP
-    if (sockfd < 0 || buf == NULL || len == 0 || dest_addr == NULL || dest_addr->sa_family != AF_INET) {
-        mtp_errno = EINVAL;
-        return -1;
-    }
-
-    // Find the corresponding entry in shared memory
-    int entry_index = -1;
-    for (int i = 0; i < num_mtp_sockets; i++) {
-        if (shared_memory[i].udp_socket_id == sockfd) {
-            entry_index = i;
-            break;
-        }
-    }
-    if (entry_index == -1) {
-        // Entry not found in shared memory
-        mtp_errno = EINVAL;
-        return -1;
-    }
-
-    // Check if destination IP and port match the bound IP and port
-    struct sockaddr_in *dest = (struct sockaddr_in *)dest_addr;
-    if (dest->sin_addr.s_addr != shared_memory[entry_index].destination_addr.sin_addr.s_addr ||
-        dest->sin_port != shared_memory[entry_index].destination_addr.sin_port) {
-        mtp_errno = ENOTBOUND;
-        return -1;
-    }
-
-    // Check if there is enough space in the send buffer
-    if (len > sizeof(shared_memory[entry_index].send_buffer)) {
-        mtp_errno = ENOBUFS;
-        return -1;
-    }
-
-    // Copy message to the sender side message buffer
-    memcpy(shared_memory[entry_index].send_buffer, buf, len);
-
-    // Send the message using UDP socket
-    int send_result = sendto(sockfd, buf, len, flags, dest_addr, addrlen);
-    if (send_result == -1) {
-        mtp_errno = errno;
-        return -1;
-    }
-
-    return send_result;
-}
 
 // int m_recvfrom(int sockfd, void *buf, size_t len, int flags,
 //                struct sockaddr *src_addr, socklen_t *addrlen) {
@@ -277,31 +229,7 @@ int m_close(int sockfd) {
     return 0;
 }
 
-int m_sendto(int sockfd, const char message[MAX_BUFFER_SIZE], const char *dest_ip, int dest_port) {
-    // Check if sockfd is a valid MTP socket
-    if(sockfd<0){mtp_errno = EINVAL;return -1;}
-    pthread_mutex_lock(&mutex);
-    int entry_index = -1;
-    for (int i = 0; i < SOCK_MTP;i++) {
-        if (shared_memory[i].udp_socket_id == sockfd) {entry_index = i;break;}
-    }
-    if (entry_index == -1) {pthread_mutex_unlock(&mutex);mtp_errno = EINVAL;return -1;}
-    MTPSocket mtp_socket = shared_memory[entry_index];
 
-    // Check if the destination IP and port match the bound IP and port
-    if (strcmp(mtp_socket.dest_ip, dest_ip) != 0 || mtp_socket.dest_port != dest_port) {
-        mtp_errno = ENOTBOUND;
-        return -1;
-    }
-    // Check if there is enough space in the send buffer
-    if (strlen(mtp_socket.send_buffer) + message_len >= MAX_BUFFER_SIZE) {
-        mtp_errno = ENOBUFS;
-        return -1;
-    }
 
-    // Copy the message to the send buffer
-    strcat(mtp_socket.send_buffer, message);
 
-    // Return the number of bytes written
-    return message_len;
-}
+

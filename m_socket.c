@@ -10,9 +10,12 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/select.h>
+#include <sys/time.h>
 
 #define MAX_SOCKETS 1
-#define MAX_BUFFER_SIZE 1024
+#define MAX_MSG_LEN 1000
+#define MAX_SEND_BUFFER 10
+#define MAX_RECV_BUFFER 5
 #define MAX_WINDOW_SIZE 5
 #define DATA_MESSAGE 0
 #define ACK_MESSAGE 1
@@ -23,6 +26,7 @@
 #define UDPSOCK 3
 #define ENOTBOUND 4
 #define ENOMSG 5
+#define TIME_OUT 1000
 // Structure for MTP socket information
 typedef struct {
     int is_free;
@@ -30,11 +34,14 @@ typedef struct {
     int udp_socket_id; // Socket ID assigned by the init process
     char dest_ip[16]; // Assuming IPv4
     int dest_port;
-    char send_buffer[10][MAX_BUFFER_SIZE];
-    char recv_buffer[5][MAX_BUFFER_SIZE];
+    char send_buffer[10][MAX_MSG_LEN];
+    char recv_buffer[5][MAX_MSG_LEN];
     int swnd[MAX_WINDOW_SIZE];
     int rwnd[MAX_WINDOW_SIZE];
+    int sendBuffSize;
+    struct timeval last_send_time;
 } MTPSocket;
+
 
 int mtp_errno = 0;
 // Global shared memory
@@ -51,13 +58,68 @@ void *receive_thread(void *arg) {
     pthread_mutex_unlock(&mutex);
     pthread_exit(NULL);
 }
-void *send_thread(void *arg) {
-    pthread_mutex_lock(&mutex);
-    printf("Sender thread\n");
-    sleep(1);
-    pthread_mutex_unlock(&mutex);
-    pthread_exit(NULL);
+void *send_thread(void *arg)
+{
+  pthread_mutex_lock(&mutex);
+  printf("Sender thread\n");
+//   while (1)
+//   {
+//     sleep(0.1);
+//     struct timeval current_time;
+//     gettimeofday(&current_time, NULL);
+//     for (int i = 0; i < MAX_SOCKETS; i++){
+//       if (!shared_memory[i].is_free) {
+        
+//       }
+//     }
+//   }
+  pthread_mutex_unlock(&mutex);
+  pthread_exit(NULL);
 }
+void printBufferContent(int sockfd) {
+    
+    int entry_index = -1;
+    for (int i = 0; i < MAX_SOCKETS;i++) {
+        if (shared_memory[i].udp_socket_id == sockfd) {entry_index = i;break;}
+    }
+    if (entry_index == -1) {pthread_mutex_unlock(&mutex);printf("Socket ID %d not found!\n", sockfd);}
+    MTPSocket mtpsockfd = shared_memory[entry_index];
+    printf("------------Buffer Content-------------\n");
+    for (int i = 0; i < mtpsockfd.sendBuffSize; i++) {
+    printf("    Message %d: %s\n", i+1, mtpsockfd.send_buffer[i]);
+    }
+}
+int m_sendto(int sockfd,char message[MAX_MSG_LEN], char dest_ip[16], int dest_port) {
+    // Check if sockfd is a valid MTP socket
+    if(sockfd<0){mtp_errno = EINVAL;return -1;}
+    pthread_mutex_lock(&mutex);
+    int entry_index = -1;
+    for (int i = 0; i < MAX_SOCKETS;i++) {
+        if (shared_memory[i].udp_socket_id == sockfd) {entry_index = i;break;}
+    }
+    if (entry_index == -1) {pthread_mutex_unlock(&mutex);mtp_errno = EINVAL;return -1;}
+    MTPSocket mtpsock = shared_memory[entry_index];
+    // Check if the destination IP and port match the bound IP and port
+    if (strcmp(mtpsock.dest_ip, dest_ip) != 0 || mtpsock.dest_port != dest_port) {
+        mtp_errno = ENOTBOUND;
+        return -1;
+    }
+    // Check if there is enough space in the send buffer
+    if (mtpsock.sendBuffSize>=MAX_SEND_BUFFER) {mtp_errno = ENOBUFS;return -1;}
+    // Copy the message to the send buffer
+    printf("ERROR\n");
+    printf("message to be sent = %s\n",message);
+    printf("Initial Buffer Size = %d\n",mtpsock.sendBuffSize);
+    strcpy(shared_memory[entry_index].send_buffer[mtpsock.sendBuffSize], message);
+    printf("%s\n",shared_memory[entry_index].send_buffer[mtpsock.sendBuffSize]);
+    shared_memory[entry_index].sendBuffSize++;
+    printBufferContent(mtpsock.udp_socket_id);
+    pthread_mutex_unlock(&mutex);
+    
+    return strlen(message);
+}
+
+
 int find_free_entry() {
     for (int i = 0; i < MAX_SOCKETS; i++) {
         if (shared_memory[i].is_free) {
@@ -133,11 +195,12 @@ void init() {
         shared_memory[i].udp_socket_id = -1; // Initialize to invalid socket ID
         shared_memory[i].dest_ip[0] = '\0'; // Initialize to empty string
         shared_memory[i].dest_port = 0; // Initialize to 0
+        shared_memory[i].sendBuffSize = 0;
         for(int j=0;j<10;j++){
-            strcpy(shared_memory[i].send_buffer[0], "\0");
+            strcpy(shared_memory[i].send_buffer[j], "\0");
         }
         for(int j=0;j<5;j++){
-            strcpy(shared_memory[i].recv_buffer[0], "\0");
+            strcpy(shared_memory[i].recv_buffer[j], "\0");
         }
         for (int j = 0; j < MAX_WINDOW_SIZE; j++) {
             shared_memory[i].swnd[j] = -1; // Initialize to -1
@@ -176,5 +239,10 @@ int main() {
         printf("Error binding\n");
     }
     else{printf("Socket bind successfull\n");}
+    char mess[1000]="Hello this is the first message";
+    if(m_sendto(mtp_socket,mess,dest_ip,dest_port)<0){
+        printf("Error sending message\n");
+    }
+    else{printf("Message sent Successfully\n");}
     return 0;
 }
