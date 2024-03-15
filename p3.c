@@ -1,3 +1,5 @@
+#include<time.h>
+
 void *receive_thread(void *arg) {
     // Cast argument to the set of file descriptors
     fd_set readfds;
@@ -228,8 +230,5 @@ int m_close(int sockfd) {
 
     return 0;
 }
-
-
-
 
 
