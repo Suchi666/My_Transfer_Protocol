@@ -1,3 +1,6 @@
+#ifndef MSOCKET_H
+#define MSOCKET_H
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -20,7 +23,7 @@
 #define DATA_MESSAGE 0
 #define ACK_MESSAGE 1
 #define SOCK_MTP 1
-//  Error values 
+//Error values 
 #define key 1234
 #define EINVAL 1
 #define ENOBUFS 2
@@ -47,10 +50,10 @@ typedef struct {
     struct timeval last_send_time;
 } MTPSocket;
 
-int mtp_errno = 0;
-MTPSocket *shared_memory;
-
-int buffer_index;
+extern pthread_mutex_t mutex;
+extern int mtp_errno;
+// extern MTPSocket *shared_memory;
+extern int buffer_index;
 
 void printBufferContent(int sockfd);
 int m_sendto(int sockfd,char message[MAX_MSG_LEN], char dest_ip[16], int dest_port) ;
@@ -58,3 +61,5 @@ int find_free_entry();
 int m_socket(int domain, int type, int protocol);
 int m_bind(int sockfd,char source_ip[16], int source_port,char dest_ip[16], int dest_port);
 int init();
+
+#endif 

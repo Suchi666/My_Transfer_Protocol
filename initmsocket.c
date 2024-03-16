@@ -1,5 +1,9 @@
 #include "msocket.h"
-#include "mutex.h"
+
+mtp_errno=0;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+buffer_index=0; 
+MTPSocket *shared_memory;
 
 void *receive_thread(void *arg) {
     pthread_mutex_lock(&mutex);
@@ -81,8 +85,8 @@ void *send_thread(void *arg)
 }
 void init_process() {
     // Create shared memory segment
-    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-    int shmid = shmget(IPC_PRIVATE, MAX_SOCKETS * sizeof(MTPSocket), IPC_CREAT | 0666);
+    
+    int shmid = shmget(key, MAX_SOCKETS * sizeof(MTPSocket), IPC_CREAT | 0666);
     if (shmid < 0) {
         perror("shmget");
         exit(EXIT_FAILURE);
@@ -92,7 +96,7 @@ void init_process() {
         perror("shmat");
         exit(EXIT_FAILURE);
     }
-    buffer_index=0;    
+      
     for (int i = 0; i < MAX_SOCKETS; i++) {
         shared_memory[i].is_free = 1; // Mark as free
         shared_memory[i].pid = -1; // Initialize to invalid PID
@@ -125,3 +129,8 @@ void init_process() {
     pthread_join(thread_S,NULL);
     pthread_join(thread_R, NULL);  
 }
+int main(){
+  init_process();
+  return 0;
+}
+

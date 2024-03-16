@@ -1,0 +1,14 @@
+// int init(){
+//     pid_t cpid;
+//     cpid=fork();
+//     if(cpid<0){
+//         printf("Fork Error\n");
+//     }
+//     else if(cpid==0){
+//         char *args[] = {"gnome-terminal", "--", "bash", "-c", "./init; exec bash", NULL}; 
+//         execvp("gnome-terminal",args);
+//         exit(EXIT_SUCCESS);
+//     }else{
+//         return 1;
+//     }
+// }
