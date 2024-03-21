@@ -1,9 +1,5 @@
 #include "msocket.h"
 
-mtp_errno=0;
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-buffer_index=0; 
-MTPSocket *shared_memory;
 
 void *receive_thread(void *arg) {
     pthread_mutex_lock(&mutex);
@@ -30,6 +26,7 @@ void *send_thread(void *arg)
   {
     usleep(20 * msec);
     struct timeval current_time;
+    
     pthread_mutex_lock(&mutex);
     for (int i = 0; i < MAX_SOCKETS; i++){
       if (!shared_memory[i].is_free){
@@ -50,7 +47,7 @@ void *send_thread(void *arg)
               strcat(mess,shared_memory[i].send_buffer[shared_memory[i].swnd[j]]);
               if (sendto(shared_memory[i].udp_socket_id,mess, strlen(mess), 0, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
                 printf("Send failed");
-                return;
+                pthread_exit(NULL);
               }
             }
           }
@@ -71,7 +68,7 @@ void *send_thread(void *arg)
               strcat(mess,shared_memory[i].send_buffer[idx]);
               if (sendto(shared_memory[i].udp_socket_id,mess, strlen(mess), 0, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
                 printf("Send failed");
-                return;
+                pthread_exit(NULL);
               }
             }
             idx=(idx+1)%MAX_SEND_BUFFER; 

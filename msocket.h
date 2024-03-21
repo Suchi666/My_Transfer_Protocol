@@ -52,7 +52,7 @@ typedef struct {
 
 extern pthread_mutex_t mutex;
 extern int mtp_errno;
-// extern MTPSocket *shared_memory;
+extern MTPSocket *shared_memory;
 extern int buffer_index;
 
 void printBufferContent(int sockfd);
@@ -60,6 +60,6 @@ int m_sendto(int sockfd,char message[MAX_MSG_LEN], char dest_ip[16], int dest_po
 int find_free_entry();
 int m_socket(int domain, int type, int protocol);
 int m_bind(int sockfd,char source_ip[16], int source_port,char dest_ip[16], int dest_port);
-int init();
+
 
 #endif 
