@@ -1,8 +1,7 @@
 all: initmsocket
 
-initmsocket: initmsocket.c msocket.h
-	gcc -Wall -c initmsocket.c -o initmsocket.o
-	gcc initmsocket.o -o initmsocket
+initmsocket: initmsocket.c libmsocket.a
+	gcc -Wall initmsocket.c -L. -lmsocket -o initmsocket
 
 clean:
-	rm -f initmsocket initmsocket.o
+	rm -f initmsocket
