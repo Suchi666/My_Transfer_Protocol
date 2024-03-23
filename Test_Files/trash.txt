@@ -12,3 +12,27 @@
 //         return 1;
 //     }
 // }
+
+
+    // Lock the mutex
+    if (sem_wait(mutex) == -1) {
+        perror("Failed to lock mutex");
+        return 1;
+    }
+
+    printf("Mutex locked\n");
+
+    // Simulate some critical section
+    sleep(2);
+
+    // Unlock the mutex
+    if (sem_post(mutex) == -1) {
+        perror("Failed to unlock mutex");
+        return 1;
+    }
+
+    printf("Mutex unlocked\n");
+
+    // Close and unlink the named mutex
+    sem_close(mutex);
+    sem_unlink(mutexName);

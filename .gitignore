@@ -1,9 +1,10 @@
 a.out
 .vscode
 .gitignore
-executable
+
 initialize.o
 initmsocket.o
 m_socket.o
 user.o
 run_threads
+executable

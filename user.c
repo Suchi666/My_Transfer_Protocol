@@ -1,6 +1,7 @@
 #include "msocket.h"
 
 int main() {
+    init();
     char source_ip[16]="127.0.0.1";
     int source_port=5000;
     char dest_ip[16]="127.0.0.1";
