@@ -31,3 +31,34 @@
               // // Convert port number to host byte order and print
               // int port_number = ntohs(addr.sin_port);
               // printf("Local Port Number: %d\n", port_number);
+
+
+SEND THREAD PART WHICH WAS NOT WORKING
+        if(wind_size<MAX_WINDOW_SIZE && shared_memory[i].maxSend>wind_size){
+          int idx=MAX_WINDOW_SIZE-1;
+          while(shared_memory[i].swnd[idx]==-1 && idx>=0)idx--;
+          int start_idx,end_idx;
+          if(idx<0){start_idx=0;end_idx=MAX_WINDOW_SIZE-1;}
+          else{
+              // index for next message to be inserted
+              start_idx=(shared_memory[i].swnd[idx]+1)%MAX_SEND_BUFFER;
+              end_idx=shared_memory[i].swnd[idx]-1;
+              if(end_idx<0)end_idx=0;
+          }
+          while(start_idx!=end_idx && wind_size<shared_memory[i].maxSend){
+            if(strlen(shared_memory[i].send_buffer[start_idx])!=0){
+              shared_memory[i].swnd[wind_size]=start_idx;
+              wind_size++;
+              char mess[1001];
+              sprintf(mess, "%d", idx);
+              strcat(mess,shared_memory[i].send_buffer[idx]);
+              printf("Message to send :- %s\n",mess);
+              if (sendto(shared_memory[i].udp_socket_id,mess, strlen(mess), 0, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
+                pthread_mutex_unlock(&mutex);
+                printf("Send failed 2");
+                pthread_exit(NULL);
+              }
+            }
+            start_idx=(start_idx+1)%MAX_SEND_BUFFER; 
+          }
+        }

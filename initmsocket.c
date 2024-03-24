@@ -199,20 +199,16 @@ void *send_thread(void *arg)
             }
           }
         }
-        if(wind_size<MAX_WINDOW_SIZE && shared_memory[i].maxSend>wind_size){
+      if(wind_size<MAX_WINDOW_SIZE && shared_memory[i].maxSend>wind_size){
           int idx=MAX_WINDOW_SIZE-1;
           while(shared_memory[i].swnd[idx]==-1 && idx>=0)idx--;
-          int start_idx,end_idx;
-          if(idx<0){start_idx=0;end_idx=MAX_WINDOW_SIZE-1;}
-          else{
-              // index for next message to be inserted
-              start_idx=(shared_memory[i].swnd[idx]+1)%MAX_SEND_BUFFER;
-              end_idx=shared_memory[i].swnd[idx]-1;
-              if(end_idx<0)end_idx=0;
-          }
-          while(start_idx!=end_idx && wind_size<shared_memory[i].maxSend){
-            if(strlen(shared_memory[i].send_buffer[start_idx])!=0){
-              shared_memory[i].swnd[wind_size]=start_idx;
+          if(idx<0)idx=0;
+          idx=(shared_memory[i].swnd[idx]+1)%MAX_SEND_BUFFER;
+          // int send_num=shared_memory[i].recvWindSize-wind_size;
+          int end_idx=(idx-1)>0?(idx-1):MAX_SEND_BUFFER-1;
+          while(idx!=end_idx && wind_size<shared_memory[i].maxSend){
+            if(strlen(shared_memory[i].send_buffer[idx])!=0){
+              shared_memory[i].swnd[wind_size]=idx;
               wind_size++;
               char mess[1001];
               sprintf(mess, "%d", idx);
@@ -224,7 +220,7 @@ void *send_thread(void *arg)
                 pthread_exit(NULL);
               }
             }
-            start_idx=(start_idx+1)%MAX_SEND_BUFFER; 
+            idx=(idx+1)%MAX_SEND_BUFFER; 
           }
         }
       }

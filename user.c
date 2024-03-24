@@ -17,9 +17,9 @@ int main() {
     }
     else{printf("Socket bind successfull\n");}
     char mess[1000]="Hello this is the first message";
-    // if(m_sendto(mtp_socket,mess,dest_ip,dest_port)<0){
-    //     printf("Error sending message\n");
-    // }
-    // else{printf("Message sent Successfully\n");}
+    if(m_sendto(mtp_socket,mess,dest_ip,dest_port)<0){
+        printf("Error sending message\n");
+    }
+    else{printf("Message sent Successfully\n");}
     return 0;
 }
