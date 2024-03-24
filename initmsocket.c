@@ -23,6 +23,7 @@ void *bind_thread(){
   P(semId3);
   pthread_mutex_lock(&mutex_sockid);
   int sockfd=sockId->currSockId;
+  
   // pthread_mutex_unlock(&mutex_sockid);
   pthread_mutex_lock(&mutex);
   int entry_index = -1;
@@ -46,23 +47,39 @@ void *bind_thread(){
     sockId->currSockId=-1;
     return -1;
   }
+  printf("Binded socket\n");
   pthread_mutex_unlock(&mutex_sockid);
   V(semId4);
 }
 
 void *receive_thread(void *arg) {
-  pthread_mutex_lock(&mutex);
+  
   fd_set readfds;
   int max_fd = 0;
   while (1)
   {
     FD_ZERO(&readfds);
+    pthread_mutex_lock(&mutex);
     for (int i = 0; i < MAX_SOCKETS; i++){
       if (!shared_memory[i].is_free){
+            struct sockaddr_in socket_address;
+            socklen_t address_length = sizeof(socket_address);
+
+            // Check if the socket is bound to a port
+            if (getsockname(shared_memory[i].udp_socket_id, (struct sockaddr*)&socket_address, &address_length) == 0) {
+                printf("Socket %d is bound to port %d\n", shared_memory[i].udp_socket_id, (int)ntohs(socket_address.sin_port));
+                FD_SET(shared_memory[i].udp_socket_id, &readfds); // Add socket to readfds
+                if (shared_memory[i].udp_socket_id > max_fd) {
+                    max_fd = shared_memory[i].udp_socket_id; // Update max_fd
+                }
+            } else {
+                perror("getsockname failed");
+            }
         FD_SET(shared_memory[i].udp_socket_id, &readfds);
         if (shared_memory[i].udp_socket_id > max_fd){max_fd = shared_memory[i].udp_socket_id;}
       }
     }
+    pthread_mutex_unlock(&mutex);
     // Set timeout
     struct timeval timeout;
     timeout.tv_sec = 5; // 5 seconds
@@ -71,15 +88,17 @@ void *receive_thread(void *arg) {
     if(retval<0) {perror("Select error");exit(EXIT_FAILURE);}
     if(retval== 0){printf("Timeout occurred. No data received.\n");}
     else{
+      pthread_mutex_lock(&mutex);
       for (int i = 0; i < MAX_SOCKETS; i++){
         if (!shared_memory[i].is_free && FD_ISSET(shared_memory[i].udp_socket_id, &readfds)){
           int max_len = 1002;
           char recv_buf[max_len];
           struct sockaddr_in sender_addr;
-          socklen_t sender_len = sizeof(sender_addr);
+          socklen_t sender_addr_len = sizeof(sender_addr);
           ssize_t bytesr = recvfrom(shared_memory[i].udp_socket_id, recv_buf, sizeof(recv_buf), 0,
-                                  (struct sockaddr *)&sender_addr, &sender_len);
+                                  (struct sockaddr *)&sender_addr, &sender_addr_len);
           if (bytesr == -1){perror("recvfrom");continue;}
+          printf("Message received = %s \n",recv_buf);
           int msg_type = recv_buf[0];// 0-message , 1-ack
           int seq_num = recv_buf[1];
           if (msg_type==0 && seq_num==shared_memory[i].rwnd[0]) {
@@ -90,7 +109,7 @@ void *receive_thread(void *arg) {
             shared_memory[i].recvIndex++;
             ack_msg[3]=MAX_RECV_BUFFER-shared_memory[i].recvIndex;
             sendto(shared_memory[i].udp_socket_id, ack_msg, sizeof(ack_msg), 0,
-                   (struct sockaddr *)&sender_addr, sender_len);
+                   (struct sockaddr *)&sender_addr, sizeof(sender_addr));
             for(int k=1;k<MAX_WINDOW_SIZE;k++){
               shared_memory[i].rwnd[k-1]=shared_memory[i].rwnd[k];
             }
@@ -118,12 +137,21 @@ void *receive_thread(void *arg) {
           }
         }
       }
+      pthread_mutex_unlock(&mutex);
     }
   }
-  pthread_mutex_unlock(&mutex);
+  
   pthread_exit(NULL);
 }
 
+
+// void *receive_thread(void *arg) {
+//     pthread_mutex_lock(&mutex);
+//     printf("Receive thread\n");
+//     sleep(1);
+//     pthread_mutex_unlock(&mutex);
+//     pthread_exit(NULL);
+// }
 
 long timeval_diff(struct timeval *start, struct timeval *end) {
     long seconds_diff = end->tv_sec - start->tv_sec;
@@ -153,8 +181,8 @@ void *send_thread(void *arg)
         client_addr.sin_family = AF_INET;
         client_addr.sin_addr.s_addr = inet_addr(shared_memory[i].dest_ip);
         client_addr.sin_port = htons(shared_memory[i].dest_port);
-        printf("Client address :- %s\n",shared_memory[i].dest_ip);
-        printf("Client port :- %d\n",shared_memory[i].dest_port);
+        // printf("Client address :- %s\n",shared_memory[i].dest_ip);
+        // printf("Client port :- %d\n",shared_memory[i].dest_port);
         gettimeofday(&current_time, NULL);
         int time_diff = timeval_diff(&current_time, &shared_memory[i].last_send_time);
         if (time_diff > TIME_OUT){

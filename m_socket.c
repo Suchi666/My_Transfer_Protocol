@@ -113,6 +113,7 @@ int m_bind(int sockfd,char source_ip[16], int source_port,char dest_ip[16], int 
     semctl(semId3, 0, SETVAL, 0);
 	semctl(semId4, 0, SETVAL, 0);
     int return_value;
+    
     pthread_mutex_lock(&mutex_sockid);
     if(sockId->currSockId==sockfd){
         sockId->currSockId=-1;
@@ -121,6 +122,7 @@ int m_bind(int sockfd,char source_ip[16], int source_port,char dest_ip[16], int 
     else{
         return_value=-1;
     }
+    printf("Bind return value= %d\n",return_value);
     pthread_mutex_unlock(&mutex_sockid);
     return return_value;
 }
@@ -161,7 +163,7 @@ int init(){
         shared_memory[i].dest_ip[0] = '\0'; // Initialize to empty string
         shared_memory[i].dest_port = 0;
         shared_memory[i].recvIndex = 0; // Initialize to 0
-        shared_memory[i].maxSend = 1;
+        shared_memory[i].maxSend = MAX_RECV_BUFFER;
         shared_memory[i].sendBuffSize = 0;
         for(int j=0;j<10;j++){
             strcpy(shared_memory[i].send_buffer[j], "\0");

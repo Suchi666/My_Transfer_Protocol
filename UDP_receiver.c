@@ -33,12 +33,7 @@ int main(void){
        perror("Binding failed");
     // Get input from the user:
     
-    // Send the message to server:
-    // if(sendto(socket_desc, client_message, strlen(client_message), 0,
-    //      (struct sockaddr*)&server_addr, server_struct_length) < 0){
-    //     printf("Unable to send message\n");
-    //     return -1;
-    // }
+    
     
     // Receive the server's response:
     if(recvfrom(socket_desc, server_message, sizeof(server_message), 0,
@@ -47,6 +42,14 @@ int main(void){
         return -1;
     }
     printf("Server's response: %s\n", server_message);
+
+    // Send the message to server:
+    // strcpy(client_message,"104");
+    // if(sendto(socket_desc, client_message, strlen(client_message), 0,
+    //      (struct sockaddr*)&server_addr, server_struct_length) < 0){
+    //     printf("Unable to send message\n");
+    //     return -1;
+    // }
     // Close the socket:
     close(socket_desc);
     
