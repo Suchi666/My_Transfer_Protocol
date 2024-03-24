@@ -160,7 +160,8 @@ int init(){
         shared_memory[i].source_port = 0;
         shared_memory[i].dest_ip[0] = '\0'; // Initialize to empty string
         shared_memory[i].dest_port = 0;
-        shared_memory[i].recvWindSize = MAX_RECV_BUFFER; // Initialize to 0
+        shared_memory[i].recvIndex = 0; // Initialize to 0
+        shared_memory[i].maxSend = 1;
         shared_memory[i].sendBuffSize = 0;
         for(int j=0;j<10;j++){
             strcpy(shared_memory[i].send_buffer[j], "\0");
@@ -170,7 +171,7 @@ int init(){
         }
         for (int j = 0; j < MAX_WINDOW_SIZE; j++) {
             shared_memory[i].swnd[j] = -1; // Initialize to -1
-            shared_memory[i].rwnd[j] = -1; // Initialize to -1
+            shared_memory[i].rwnd[j] = j; // Initialize to -1
         }
     }
     printf("%d",sharedVariables);

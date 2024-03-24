@@ -54,7 +54,8 @@ typedef struct {
     char recv_buffer[5][MAX_MSG_LEN];
     int swnd[MAX_WINDOW_SIZE];
     int rwnd[MAX_WINDOW_SIZE];
-    int recvWindSize;
+    int maxSend;
+    int recvIndex;
     int sendBuffSize;
     struct timeval last_send_time;
 } MTPSocket;
